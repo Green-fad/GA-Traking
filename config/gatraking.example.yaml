@@ -1,0 +1,78 @@
+# ============================================================
+# GAtraking - Configuration principale (exemple)
+# Copier vers config/gatraking.yaml puis adapter.
+# Toute valeur peut etre surchargee par variable d'environnement
+# GA__SECTION__CLE, ex: GA__SERVER__PORT=8100
+# ============================================================
+
+site:
+  name: "Site principal"
+  timezone: "Europe/Paris"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  secret_key: "CHANGER-CETTE-CLE-AU-PRIMO-DEMARRAGE"
+  token_expire_minutes: 480
+
+ai:
+  # auto : YOLO ONNX si modele present, sinon detcteur de secours MOG2
+  detector: "auto"
+  model_path: "models/yolov8n.onnx"
+  conf_threshold: 0.35
+  iou_threshold: 0.45
+  # ByteTrack
+  track_high_thresh: 0.5
+  track_low_thresh: 0.1
+  track_buffer: 30
+  max_frames_without_gpu_fallback: 3
+
+road:
+  speed_limit_kmh: 80.0
+  stopped_speed_kmh: 3.0
+  stopped_min_seconds: 8.0
+  min_track_points: 6
+  speed_smoothing_alpha: 0.35
+  speed_min_samples: 4
+
+security:
+  intrusion_min_frames: 6
+  fire_min_area_px: 220
+  fire_min_frames: 8
+  anomaly_zscore: 3.0
+
+data:
+  # SQLite par defaut (fonctionnement hors-ligne) ; PostgreSQL en production
+  # postgresql+psycopg2://gatraking:motdepasse@localhost:5432/gatraking
+  database_url: "sqlite:///data/gatraking.db"
+  redis_url: "redis://localhost:6379/0"
+  media_dir: "data/media"
+  retention_days: 30
+
+cloud:
+  enabled: false
+  api_url: "https://cloud.example.com/api/v1"
+  api_token: ""
+  sync_interval_seconds: 30
+  batch_size: 50
+  llm:
+    # "none" | "cloud" (compatible OpenAI) | "local" (compatible Ollama)
+    provider: "none"
+    model: ""
+    api_url: ""
+    api_key: ""
+    timeout_seconds: 30
+
+cameras:
+  - id: "cam-01"
+    name: "Entree principale"
+    source: "rtsp://192.168.1.10:554/stream1"
+    enabled: true
+    fps_limit: 15.0
+    location: { x: 0.2, y: 0.3 }
+  - id: "cam-02"
+    name: "Aire de pesage"
+    source: "rtsp://192.168.1.11:554/stream1"
+    enabled: true
+    fps_limit: 15.0
+    location: { x: 0.7, y: 0.5 }

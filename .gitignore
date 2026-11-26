@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+*.egg
+
+# Donnees operationnelles (non versionnees)
+data/
+*.db
+*.sqlite
+models/*.onnx
+models/*.pt
+models/weights/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+*.log
+
+# Environnement et secrets
+.env
+.env.*
+config/gatraking.yaml
+config/*secret*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Sorties de demonstration volumineuses
+demo_output/
+*.mp4
+!docs/assets/*.mp4
