@@ -171,7 +171,8 @@ class TestEndpoints:
 
     def test_medias_traversee_bloquee_api(self, client):
         token = _login(client).json()["token"]
-        response = client.get("/api/media/../../etc/passwd",
+        # %2e%2e survit a la normalisation httpx et decode en "../" cote serveur
+        response = client.get("/api/media/%2e%2e/%2e%2e/etc/passwd",
                               headers={"Authorization": f"Bearer {token}"})
         assert response.status_code in (400, 404)
 

@@ -1,0 +1,38 @@
+name: CI GAtraking
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dependances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Vérifier les imports des modules
+        run: python -c "
+          import ga.core, ga.vision, ga.track, ga.road, ga.security,
+          import ga.intelligence, ga.operations, ga.data, cloud_server
+          print('imports OK')"
+
+      - name: Tests unitaires + integration + securite + resilience
+        run: python -m pytest tests/ -q --tb=short
+        env:
+          GA__SERVER__SECRET_KEY: cle-de-ci-32-caracteres-minimum-1234
+
+      - name: Demonstration bout-en-bout
+        run: python tools/demo_pipeline.py --frames 300 --output demo_ci

@@ -1,0 +1,25 @@
+{
+  "models": [
+    {
+      "name": "yolov8n",
+      "version": "8.3",
+      "path": "models/yolov8n.onnx",
+      "sha256": "3a459c76df2a9dae21dd0678107425627148bf6a035f11fa377dd868d44c7b57",
+      "classes": [
+        "personne",
+        "velo",
+        "voiture",
+        "moto",
+        "bus",
+        "camionnette",
+        "camion",
+        "chien",
+        "chat",
+        "sac_a_dos",
+        "valise",
+        "velo_electrique"
+      ],
+      "added_at": "2026-11-26T01:37:24.401351+00:00"
+    }
+  ]
+}

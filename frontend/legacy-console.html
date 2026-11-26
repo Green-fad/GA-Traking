@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAtraking — Console d'exploitation</title>
+<style>
+:root{--bg:#0b1220;--panel:#101a2e;--border:#1e2a44;--text:#e2e8f0;--muted:#94a3b8;
+--accent:#22d3ee;--danger:#ef4444;--warn:#f59e0b;--ok:#10b981;--indigo:#6366f1}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}
+.login{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:1rem}
+.login .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:2rem;max-width:380px;width:100%}
+h1{font-size:1.4rem;letter-spacing:.5px}
+h2{font-size:1.1rem;margin-bottom:.75rem}
+label{display:block;font-size:.8rem;color:var(--muted);margin:.7rem 0 .25rem}
+input,select,textarea{width:100%;background:#0a1220;border:1px solid var(--border);color:var(--text);
+border-radius:8px;padding:.55rem .7rem;font:inherit}
+button{background:var(--accent);border:none;color:#06222b;font-weight:600;border-radius:8px;
+padding:.55rem 1rem;cursor:pointer;font:inherit}
+button.sec{background:transparent;border:1px solid var(--border);color:var(--text)}
+button.danger{background:var(--danger);color:#fff}
+button.ok{background:var(--ok);color:#04231a}
+.app{display:flex;min-height:100vh}
+aside{width:210px;background:#0a1220;border-right:1px solid var(--border);padding:1rem .6rem;flex-shrink:0}
+aside .logo{font-weight:700;color:var(--accent);padding:.4rem .7rem 1rem}
+aside nav a{display:block;padding:.5rem .7rem;border-radius:8px;color:var(--muted);margin:.15rem 0}
+aside nav a.on,aside nav a:hover{background:var(--panel);color:var(--text)}
+main{flex:1;padding:1.2rem;min-width:0}
+.topbar{display:flex;gap:.6rem;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid var(--border);border-radius:99px;padding:.2rem .7rem;font-size:.75rem;color:var(--muted)}
+.grid{display:grid;gap:1rem}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1rem}
+.kpi .card{text-align:center}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:1rem;overflow:hidden}
+.card .n{font-size:1.9rem;font-weight:700;color:var(--accent)}
+.card .l{font-size:.78rem;color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:900px){.cols{grid-template-columns:1fr}.app{flex-direction:column}aside{width:100%}}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{color:var(--muted);text-align:left;font-weight:500;padding:.4rem .5rem;border-bottom:1px solid var(--border)}
+td{padding:.45rem .5rem;border-bottom:1px solid #16203a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:#0d1729}
+.badge{border-radius:99px;padding:.1rem .55rem;font-size:.72rem;font-weight:600}
+.b-critical{background:#3f1d24;color:var(--danger)}.b-warning{background:#3a2c12;color:var(--warn)}
+.b-info{background:#12283f;color:var(--accent)}.b-ok{background:#0f2e22;color:var(--ok)}
+.toolbar{display:flex;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
+.muted{color:var(--muted);font-size:.8rem}
+.hidden{display:none}
+pre{background:#0a1220;border:1px solid var(--border);border-radius:8px;padding:.8rem;overflow:auto;
+max-height:420px;font-size:.75rem;white-space:pre-wrap}
+.actions{display:flex;gap:.4rem;margin-top:.6rem;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<!-- Connexion -->
+<div id="v-login" class="login">
+  <form class="card" onsubmit="return doLogin(event)">
+    <h1>GA<span style="color:var(--accent)">traking</span></h1>
+    <p class="muted" style="margin:.3rem 0 1rem">Console d'exploitation — vision artificielle &amp; surveillance</p>
+    <label>Utilisateur</label><input id="l-user" autocomplete="username" required>
+    <label>Mot de passe</label><input id="l-pass" type="password" autocomplete="current-password" required>
+    <div style="margin-top:1rem"><button style="width:100%">Se connecter</button></div>
+    <p id="l-err" class="muted" style="color:var(--danger);margin-top:.6rem"></p>
+    <p class="muted" style="margin-top:1rem">Premier demarrage : admin / GAt Admin#2026 (a changer)</p>
+  </form>
+</div>
+
+<!-- Application -->
+<div id="v-app" class="app hidden">
+  <aside>
+    <div class="logo">GAtraking</div>
+    <nav id="nav">
+      <a data-v="dash" class="on">Tableau de bord</a>
+      <a data-v="alerts">Centre d'alertes</a>
+      <a data-v="events">Evenements</a>
+      <a data-v="dossiers">Dossiers</a>
+      <a data-v="cameras">Cameras</a>
+      <a data-v="map">Cartographie</a>
+      <a data-v="assistant">Assistant IA</a>
+      <a data-v="system">Systeme</a>
+    </nav>
+    <div style="margin-top:auto;padding:.7rem" class="muted" id="who"></div>
+    <button class="sec" style="width:100%" onclick="logout()">Deconnexion</button>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+const API='/api';let TOKEN=localStorage.getItem('ga_token')||'';let ROLE='';
+const $=s=>document.querySelector(s);
+function h(s){const d=document.createElement('div');d.textContent=s??'';return d.innerHTML}
+async function api(path,opts={}){
+  const r=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json',
+    ...(TOKEN?{'Authorization':'Bearer '+TOKEN}:{}),...(opts.headers||{})}});
+  if(r.status===401){logout();throw new Error('session expiree')}
+  if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||('HTTP '+r.status));
+  return r.status===204?null:r.json();
+}
+async function doLogin(e){e.preventDefault();
+  try{const d=await api('/auth/login',{method:'POST',body:JSON.stringify(
+    {username:$('#l-user').value,password:$('#l-pass').value})});
+    TOKEN=d.token;ROLE=d.utilisateur.role;localStorage.setItem('ga_token',TOKEN);
+    enter(d.utilisateur.username);
+  }catch(err){$('#l-err').textContent=err.message}return false}
+function logout(){TOKEN='';localStorage.removeItem('ga_token');$('#v-app').classList.add('hidden');
+  $('#v-login').classList.remove('hidden')}
+function enter(user){$('#v-login').classList.add('hidden');$('#v-app').classList.remove('hidden');
+  $('#who').textContent=user+' ('+ROLE+')';go('dash')}
+document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>go(a.dataset.v));
+
+function badge(s){const m={critical:'b-critical',warning:'b-warning',info:'b-info'};
+  return `<span class="badge ${m[s]||'b-ok'}">${s}</span>`}
+function statut(s){const m={nouveau:'b-critical',acquittee:'b-warning',resolue:'b-ok',
+  a_verifier:'b-warning',valide:'b-ok',rejete:'b-critical',conteste:'b-info'};
+  return `<span class="badge ${m[s]||'b-info'}">${s}</span>`}
+const dt=iso=>new Date(iso).toLocaleString('fr-FR');
+
+/* ---------- vues ---------- */
+const VIEWS={};
+async function go(v){document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===v));
+  const m=$('#main');m.innerHTML='<p class="muted">Chargement…</p>';
+  try{m.innerHTML=await VIEWS[v]();await (AFTER[v]||(()=>{}))()}
+  catch(err){m.innerHTML=`<div class="card"><b>Erreur :</b> ${h(err.message)}</div>`}}
+const AFTER={};
+
+VIEWS.dash=async()=>{const d=await api('/dashboard/summary');
+  const serie=d.serie_journaliere.reduce((a,r)=>{a[r.day]=(a[r.day]||0)+r.count;return a},{});
+  const max=Math.max(1,...Object.values(serie));
+  const bars=Object.keys(serie).sort().map(j=>`<div style="flex:1;text-align:center">
+    <div style="height:${8+60*serie[j]/max}px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.85"></div>
+    <div class="muted" style="font-size:.65rem">${j.slice(5)}</div></div>`).join('');
+  return `<h2>Tableau de bord</h2>
+  <div class="kpi">
+    <div class="card"><div class="n">${d.alertes_ouvertes}</div><div class="l">Alertes ouvertes</div></div>
+    <div class="card"><div class="n">${d.evenements_24h}</div><div class="l">Evenements 24 h</div></div>
+    <div class="card"><div class="n">${d.dossiers_a_verifier}</div><div class="l">Dossiers a verifier</div></div>
+    <div class="card"><div class="n">${d.cameras_en_ligne}/${d.cameras_total}</div><div class="l">Cameras en ligne</div></div>
+  </div>
+  <div class="cols"><div class="card"><h2>Activite 7 jours</h2>
+    <div style="display:flex;align-items:flex-end;gap:.4rem;height:100px">${bars||'<span class="muted">Aucune donnee</span>'}</div></div>
+  <div class="card"><h2>Dernieres alertes</h2><table><tbody>
+    ${(d.alertes_recentes||[]).map(a=>`<tr><td>${dt(a.ts)}</td><td>${badge(a.gravite)}</td>
+      <td>${h(a.message)}</td><td>${statut(a.statut)}</td></tr>`).join('')||'<tr><td class="muted">Aucune alerte</td></tr>'}
+  </tbody></table></div></div>`};
+
+VIEWS.alerts=async()=>{const list=await api('/alerts?limit=200');
+  return `<h2>Centre d'alertes</h2><div class="toolbar">
+    <button class="sec" onclick="go('alerts')">Actualiser</button>
+    <span class="muted">WebSocket temps reel : ws /ws/alerts</span></div>
+  <div class="card"><table><thead><tr><th>Horodatage</th><th>Gravite</th><th>Type</th>
+    <th>Message</th><th>Camera</th><th>Statut</th><th></th></tr></thead><tbody>
+  ${list.map(a=>`<tr><td>${dt(a.ts)}</td><td>${badge(a.gravite)}</td><td>${h(a.type)}</td>
+    <td title="${h(a.message)}">${h(a.message)}</td><td>${h(a.camera||'—')}</td><td>${statut(a.statut)}</td>
+    <td>${a.statut==='nouveau'&&ROLE!=='observateur'
+      ?`<button class="sec" onclick="ack('${a.uuid}')">Acquitter</button>
+        <button class="ok" onclick="resolve('${a.uuid}')">Resoudre</button>`:''}</td></tr>`).join('')
+    ||'<tr><td colspan="7" class="muted">Aucune alerte</td></tr>'}
+  </tbody></table></div>`};
+async function ack(u){await api(`/alerts/${u}/ack`,{method:'POST'});go('alerts')}
+async function resolve(u){await api(`/alerts/${u}/resolve`,{method:'POST'});go('alerts')}
+
+VIEWS.events=async()=>{const list=await api('/events?limit=200');
+  return `<h2>Historique des evenements</h2><div class="card"><table>
+  <thead><tr><th>Horodatage</th><th>Type</th><th>Gravite</th><th>Camera</th><th>Details</th></tr></thead><tbody>
+  ${list.map(e=>`<tr><td>${dt(e.ts)}</td><td>${h(e.type)}</td><td>${badge(e.gravite)}</td>
+    <td>${h(e.camera||'—')}</td><td class="muted" title="${h(JSON.stringify(e.payload))}">${h(JSON.stringify(e.payload).slice(0,80))}</td></tr>`).join('')
+    ||'<tr><td colspan="5" class="muted">Aucun evenement</td></tr>'}</tbody></table></div>`};
+
+VIEWS.dossiers=async()=>{const list=await api('/dossiers?limit=100');
+  return `<h2>Dossiers de preuve — validation humaine obligatoire</h2>
+  <div class="card"><table><thead><tr><th>Horodatage</th><th>Type</th><th>Statut</th>
+  <th>Camera</th><th>Preuve</th><th>Decision</th></tr></thead><tbody>
+  ${list.map(d=>`<tr><td>${dt(d.ts)}</td><td>${h(d.type)}</td><td>${statut(d.statut)}</td>
+    <td>${h(d.camera||'—')}</td>
+    <td>${(d.images||[]).map(i=>`<a href="${API}/media/${i.chemin}" target="_blank">image</a>`).join(' ')||'—'}</td>
+    <td>${d.statut==='a_verifier'&&ROLE!=='observateur'
+      ?`<button class="ok" onclick="decider('${d.uuid}','valide')">Valider</button>
+        <button class="danger" onclick="decider('${d.uuid}','rejete')">Rejeter</button>`
+      :h(d.decision_par||'')+' '+h(d.commentaire||'')}</td></tr>`).join('')
+    ||'<tr><td colspan="6" class="muted">Aucun dossier</td></tr>'}</tbody></table></div>
+  <p class="muted" style="margin-top:.7rem">Aucune sanction automatique : toute decision est
+  journalisee dans le registre d'audit et peut etre contestee.</p>`};
+async function decider(u,decision){const c=prompt('Commentaire de decision :')||'';
+  await api(`/dossiers/${u}/decide`,{method:'POST',body:JSON.stringify({decision,comment:c})});go('dossiers')}
+
+VIEWS.cameras=async()=>{const list=await api('/cameras');
+  return `<h2>Gestion des cameras</h2><div class="card"><table>
+  <thead><tr><th>ID</th><th>Nom</th><th>Source</th><th>Etat</th><th>Images</th><th>Flux</th></tr></thead><tbody>
+  ${list.map(c=>`<tr><td>${h(c.id)}</td><td>${h(c.nom)}</td><td class="muted">${h(c.source)}</td>
+    <td>${c.active?'<span class="badge b-ok">configuree</span>':'<span class="badge b-warning">inactive</span>'}</td>
+    <td>${c.runtime?c.runtime.images_traitees:'—'}</td>
+    <td>${c.runtime?c.runtime.actif?'<span class="badge b-ok">en ligne</span>':'<span class="badge b-critical">hors ligne</span>':'<span class="muted">service arrete</span>'}</td></tr>`).join('')
+    ||'<tr><td colspan="6" class="muted">Aucune camera configuree</td></tr>'}</tbody></table></div>`};
+
+VIEWS.map=async()=>{const list=await api('/cameras');
+  return `<h2>Cartographie des installations</h2>
+  <div class="card" style="position:relative;height:420px;background:
+    linear-gradient(160deg,#0d1729 60%,#101a2e)">
+  ${list.map(c=>`<div title="${h(c.nom)}" style="position:absolute;left:${(c.position?.x??0.5)*90}%;
+    top:${(c.position?.y??0.5)*80}%;transform:translate(-50%,-50%);text-align:center">
+    <div style="width:14px;height:14px;border-radius:50%;background:${c.runtime?.actif?'var(--ok)':'var(--danger)'};
+      margin:0 auto;box-shadow:0 0 12px ${c.runtime?.actif?'var(--ok)':'var(--danger)'}"></div>
+    <div class="muted" style="font-size:.7rem;margin-top:.3rem">${h(c.id)}</div></div>`).join('')}
+  <p class="muted" style="position:absolute;bottom:.8rem;left:1rem">Positions configurees
+  (location.x / location.y de chaque camera). Vert = flux actif, rouge = flux perdu.</p></div>`};
+
+VIEWS.assistant=async()=>{return `<h2>Assistant d'exploitation (GA-INTELLIGENCE)</h2>
+  <div class="card"><div id="chat" style="min-height:120px;margin-bottom:.8rem"></div>
+  <form onsubmit="return askA(event)" style="display:flex;gap:.5rem">
+    <input id="a-q" placeholder="Ex : combien d'alertes aujourd'hui ?"><button>Envoyer</button></form></div>`};
+AFTER.assistant=()=>{$('#chat').innerHTML='<p class="muted">Requetes en liste blanche : alertes, '
+  +'evenements, cameras, dossiers. Aucune donnee personnelle ne quitte le site.</p>'};
+async function askA(e){e.preventDefault();const q=$('#a-q').value;
+  $('#chat').innerHTML+=`<p><b>Vous :</b> ${h(q)}</p>`;
+  try{const d=await api('/intelligence/assistant',{method:'POST',body:JSON.stringify({message:q})});
+    $('#chat').innerHTML+=`<p><b style="color:var(--accent)">Assistant :</b> ${h(d.reponse)}</p>`;
+  }catch(err){$('#chat').innerHTML+=`<p style="color:var(--danger)">${h(err.message)}</p>`}
+  $('#a-q').value='';return false}
+
+VIEWS.system=async()=>{const[res,cloud,modules]=await Promise.all([
+    api('/system/resources'),api('/system/cloud'),api('/system/modules')]);
+  const logs=await api('/system/logs?limit=60');
+  return `<h2>Systeme</h2>
+  <div class="cols"><div class="card"><h2>Ressources materielles</h2>
+    <table><tbody>
+    <tr><td>CPU</td><td>${res.cpu_percent} % (${res.cpu_coeurs} coeurs)</td></tr>
+    <tr><td>RAM</td><td>${res.ram_percent} % sur ${res.ram_total_go} Go</td></tr>
+    <tr><td>Disque</td><td>${res.disque_percent} %</td></tr>
+    <tr><td>Acceleration</td><td>${(res.acceleration.providers_onnx||[]).join(', ')||'MOG2 (CPU)'}</td></tr>
+    <tr><td>Detecteur</td><td>${h(res.acceleration.detecteur)}</td></tr>
+    <tr><td>Medias</td><td>${res.medias.fichiers} fichiers, ${(res.medias.octets/1e6).toFixed(1)} Mo</td></tr>
+    </tbody></table></div>
+  <div class="card"><h2>Connexion cloud</h2><table><tbody>
+    <tr><td>Cloud</td><td>${cloud.cloud_active?'active':'desactive (fonctionnement 100% local)'}</td></tr>
+    <tr><td>File de sync</td><td>${JSON.stringify(cloud.synchronisation.file||{})}</td></tr>
+    <tr><td>LLM</td><td>${cloud.llm.provider} ${cloud.llm.connecte?'(connecte)':''}</td></tr>
+    </tbody></table>
+    <h2 style="margin-top:1rem">Modules</h2>
+    <table><tbody>${Object.entries(modules).map(([n,s])=>
+      `<tr><td>${h(n)}</td><td>${s.healthy?'<span class="badge b-ok">sain</span>'
+        :`<span class="badge b-critical">${h(s.detail)}</span>`}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card" style="margin-top:1rem"><h2>Journaux systeme</h2>
+    <pre>${h(logs.slice(-40).map(l=>`${l.ts} [${l.level}] ${l.logger}: ${l.msg}`).join('\n'))||'Aucun journal'}</pre></div>`};
+
+/* temps reel : WebSocket alertes */
+function wsConnect(){if(!TOKEN)return;const ws=new WebSocket(
+  `${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/alerts?token=${TOKEN}`);
+  ws.onmessage=ev=>{const d=JSON.parse(ev.data);
+    if(d.type==='alert.created')console.info('Nouvelle alerte :',d.message)}}
+
+if(TOKEN){api('/auth/me').then(u=>{ROLE=u.role;enter(u.username)}).catch(()=>logout())}
+</script>
+</body>
+</html>

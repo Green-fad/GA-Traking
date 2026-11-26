@@ -27,7 +27,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def setup_logging(level: str = "INFO", logfile: str | None = "data/gatraking.log") -> None:
-    """Configurer la journalisation JSON sur console + fichier."""
+    """Configurer la journalisation JSON : console + fichier avec rotation (5 Mo x 5)."""
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
     for handler in list(root.handlers):
@@ -37,10 +37,12 @@ def setup_logging(level: str = "INFO", logfile: str | None = "data/gatraking.log
     console.setFormatter(formatter)
     root.addHandler(console)
     if logfile:
+        from logging.handlers import RotatingFileHandler
         from pathlib import Path
 
         Path(logfile).parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(logfile, encoding="utf-8")
+        file_handler = RotatingFileHandler(logfile, maxBytes=5_000_000, backupCount=5,
+                                           encoding="utf-8")
         file_handler.setFormatter(formatter)
         root.addHandler(file_handler)
 

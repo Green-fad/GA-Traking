@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -232,6 +232,31 @@ def create_app(ctx: AppContext) -> FastAPI:
         if not ok:
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "encodage image impossible")
         return Response(content=buffer.tobytes(), media_type="image/jpeg")
+
+    @app.get("/api/cameras/{camera_id}/stream")
+    async def camera_stream(camera_id: str, user: dict = Depends(auth.get_current_user)):
+        """Flux MJPEG d'instantanes (~2 images/s, cadence d'echantillonnage GA-SECURITY).
+
+        Pour du temps reel plein debit, brancher directement le flux RTSP de la
+        camera sur un visionneur ; ce flux sert au mur video de la console.
+        """
+        if ctx.processor is None:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "pipeline non demarre")
+
+        async def mjpeg():
+            import asyncio
+
+            while True:
+                frame = ctx.processor.stream_frame(camera_id)
+                if frame is not None:
+                    ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                    if ok:
+                        yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+                               + buffer.tobytes() + b"\r\n")
+                await asyncio.sleep(0.5)
+
+        return StreamingResponse(mjpeg(),
+                                 media_type="multipart/x-mixed-replace; boundary=frame")
 
     # ---- alertes ------------------------------------------------------------
     @app.get("/api/alerts")
@@ -508,17 +533,28 @@ def create_app(ctx: AppContext) -> FastAPI:
             app.state.ws_clients.discard(websocket)
 
     # ---- frontend SPA ------------------------------------------------------------
+    # priorite : build React (frontend/dist) sinon console legacy autonome
     frontend_dist = Path("frontend/dist")
-    if frontend_dist.exists():
+    legacy_console = Path("frontend/legacy-console.html")
+    if frontend_dist.exists() and (frontend_dist / "index.html").exists():
         if (frontend_dist / "assets").exists():
             app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str):
+            if full_path.startswith("api/") or full_path == "api":
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "route API inconnue")
             candidate = frontend_dist / full_path
             if full_path and candidate.is_file() and candidate.resolve().is_relative_to(frontend_dist.resolve()):
                 return FileResponse(candidate)
             return FileResponse(frontend_dist / "index.html")
+    elif legacy_console.exists():
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def legacy_fallback(full_path: str):
+            if full_path.startswith("api/") or full_path == "api":
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "route API inconnue")
+            return FileResponse(legacy_console)
 
     @app.get("/api/health", include_in_schema=False)
     def health():

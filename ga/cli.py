@@ -34,7 +34,8 @@ def build_system(cfg: AppConfig, *, with_cameras: bool = True, loop_files: bool 
     processor = EventProcessor(cfg, bus, media, cloud_sync=cfg.cloud.enabled)
     manager = CameraManager(cfg.cameras, cfg.ai, bus, loop_files=loop_files) if with_cameras else None
     sync_engine = SyncEngine(cfg.cloud.api_url, cfg.cloud.api_token,
-                             cfg.cloud.batch_size, cfg.cloud.sync_interval_seconds) if cfg.cloud.enabled else None
+                             cfg.cloud.batch_size, cfg.cloud.sync_interval_seconds,
+                             site_name=cfg.site.name) if cfg.cloud.enabled else None
     llm = create_llm(cfg.cloud.llm)
     registry = ServiceRegistry()
     registry.register(bus) if False else None  # bus non-GAModule : gere par le pipeline

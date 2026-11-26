@@ -7,6 +7,7 @@ dossiers de preuves et alertes — le tout avec persistance et synchronisation.
 from __future__ import annotations
 
 import uuid
+from collections import deque
 from typing import Any
 
 import numpy as np
@@ -67,6 +68,7 @@ class EventProcessor(GAModule):
         self.dossiers = DossierBuilder(media, bus, cloud_sync=cloud_sync)
         self._camera_ctx: dict[str, dict[str, Any]] = {}
         self._last_frames: dict[str, np.ndarray] = {}
+        self._frame_buffers: dict[str, deque] = {}
         self._dossier_ts: dict[str, float] = {}
         self._emit_ts: dict[str, float] = {}
         self._event_stats = {"traitees": 0, "alertes": 0, "dossiers": 0, "evenements_db": 0}
@@ -121,6 +123,15 @@ class EventProcessor(GAModule):
     def last_frame(self, camera_id: str) -> np.ndarray | None:
         """Derniere image vue pour cette camera (instantane pour le mur video)."""
         return self._last_frames.get(camera_id)
+
+    def stream_frame(self, camera_id: str) -> np.ndarray | None:
+        """Image pour le flux MJPEG : rotation dans un petit buffer d'instantanes."""
+        buffer = self._frame_buffers.get(camera_id)
+        if not buffer:
+            return self._last_frames.get(camera_id)
+        frame = buffer[0]
+        buffer.rotate(-1)
+        return frame
 
     # ---- traitement des pistes ---------------------------------------------
     def _on_tracks(self, event: GAEvent) -> None:
@@ -293,6 +304,8 @@ class EventProcessor(GAModule):
         if not isinstance(frame, np.ndarray):
             return
         self._last_frames[camera_id] = frame
+        buffer = self._frame_buffers.setdefault(camera_id, deque(maxlen=4))
+        buffer.append(frame)
         result = ctx["feu"].analyze(frame)
         if result.get("flamme") and self._should_emit(f"incendie:{camera_id}",
                                                       float(event.payload.get("ts", 0.0)), 30.0):
