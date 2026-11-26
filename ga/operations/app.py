@@ -510,7 +510,8 @@ def create_app(ctx: AppContext) -> FastAPI:
     # ---- frontend SPA ------------------------------------------------------------
     frontend_dist = Path("frontend/dist")
     if frontend_dist.exists():
-        app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+        if (frontend_dist / "assets").exists():
+            app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def spa_fallback(full_path: str):
