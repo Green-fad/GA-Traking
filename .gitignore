@@ -18,7 +18,7 @@ models/weights/
 
 # Node / frontend
 frontend/node_modules/
-frontend/dist/
+# frontend/dist/ : le build React EST versionne (deploiement Windows sans Node)
 *.log
 
 # Environnement et secrets

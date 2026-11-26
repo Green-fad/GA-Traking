@@ -120,7 +120,12 @@ def create_app(ctx: AppContext) -> FastAPI:
     def broadcast_alert(event: GAEvent) -> None:
         """Diffuser les alertes aux clients WebSocket connectes."""
         clients = list(app.state.ws_clients)
-        payload = json.dumps({"type": event.type, **event.payload}, default=str)
+        # le champ "type" du message est l'evenement bus ; le type d'alerte metier
+        # reste disponible sous "type_alerte" (le payload ne doit pas l'ecraser)
+        data = dict(event.payload)
+        data["type"] = "alert.created"
+        data["type_alerte"] = event.payload.get("type")
+        payload = json.dumps(data, default=str)
         for ws in clients:
             try:
                 asyncio.get_running_loop().create_task(_safe_send(ws, payload))

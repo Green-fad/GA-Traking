@@ -43,10 +43,37 @@ surchargable par variable d'environnement `GA__SECTION__CLE` (ex. `GA__SERVER__P
 Caméras : `analysis.counting_lines`, `analysis.zones`, `analysis.calibration`
 (4 points image ↔ 4 points mètres — **la mesure de vitesse exige cette calibration**).
 
+## Modèle IA (YOLO)
+
+```bash
+python tools/fetch_model.py   # télécharge yolov8n.pt officiel, convertit ONNX,
+                              # enregistre la version (SHA-256) et teste l'inférence réelle
+```
+
+Sans modèle, le détecteur de secours MOG2 prend automatiquement le relais (100 % hors-ligne).
+
+## Frontend
+
+Console React/TypeScript (12 vues, français, thème security-ops) : le **build est
+versionné** dans `frontend/dist/` et servi par l'API — aucun Node requis pour l'exploitation.
+
+```bash
+cd frontend && npm install && npm run dev    # développement (proxy /api → :8000)
+npm run build                                # régénérer dist/ (tsc strict)
+```
+
+## Serveur cloud (réception multisites)
+
+```bash
+GA_CLOUD_TOKEN=jeton uvicorn cloud_server.app:create_app --factory --port 8100
+# GET  /api/v1/health           POST /api/v1/sync/batch (idempotent)
+# GET  /api/v1/stats/multisite  GET /api/v1/sites
+```
+
 ## Tests
 
 ```bash
-python -m pytest tests/ -q        # 79 tests : unitaires, intégration, sécurité, résilience
+python -m pytest tests/ -q        # 85 tests : unitaires, YOLO réel, intégration, cloud E2E, sécurité, résilience
 python tools/load_test.py         # test de charge API (usage : python tools/load_test.py --users 30 --seconds 15)
 python tools/demo_pipeline.py     # démonstration complète avec vérité terrain
 ```
