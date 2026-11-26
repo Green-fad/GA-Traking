@@ -4,8 +4,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-build/
-dist/
+/dist/
 *.egg
 
 # Donnees operationnelles (non versionnees)
