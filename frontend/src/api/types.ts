@@ -97,6 +97,8 @@ export interface Dossier {
   type: string;
   statut: string;
   camera: string | null;
+  plaque: string | null;
+  identifie: boolean;
   images: string[];
   metriques: Record<string, unknown>;
   decision_par: string | null;
@@ -107,6 +109,28 @@ export interface DossierDetail extends Dossier {
   preuves: Record<string, unknown>;
   decision_ts: string | null;
   motif_contestation: string | null;
+}
+
+// identification du titulaire via les registres officiels (CIN masqué selon le rôle)
+export interface IdentificationTitulaire {
+  trouve: boolean;
+  plaque?: string;
+  source: string;
+  horodatage: string;
+  nom?: string;
+  prenom?: string;
+  cin?: string;
+  vehicule?: string;
+  couleur?: string;
+}
+
+export interface EtatRegistres {
+  actif: boolean;
+  base_legale: string;
+  fournisseur: string;
+  limite_minute: number;
+  masquer_adresse: boolean;
+  connecteur: string;
 }
 
 // ---- utilisateurs -----------------------------------------------------------

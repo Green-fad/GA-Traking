@@ -8,7 +8,9 @@ import type {
   DossierDetail,
   EntreeJournal,
   EtatCloud,
+  EtatRegistres,
   Evenement,
+  IdentificationTitulaire,
   ParametresIA,
   Rapport,
   ReponseAssistant,
@@ -159,6 +161,12 @@ export const api = {
     }),
   contesterDossier: (uuid: string, motif: string) =>
     requete<{ uuid: string; statut: string }>(`/dossiers/${uuid}/contest`, { method: 'POST', body: { reason: motif } }),
+  // identification du titulaire via les registres officiels (habilitation, audité)
+  identifierDossier: (uuid: string, plaque?: string) =>
+    requete<IdentificationTitulaire & { uuid: string }>(`/dossiers/${uuid}/identifier`, {
+      method: 'POST',
+      body: plaque ? { plaque } : undefined,
+    }),
 
   // ---- utilisateurs ---------------------------------------------------------------------
   utilisateurs: () => requete<UtilisateurItem[]>('/users'),
@@ -176,6 +184,7 @@ export const api = {
   // ---- système ------------------------------------------------------------------------------
   ressources: () => requete<RessourcesSysteme>('/system/resources'),
   cloud: () => requete<EtatCloud>('/system/cloud'),
+  etatRegistres: () => requete<EtatRegistres>('/registres/etat'),
   modules: () => requete<Record<string, SanteModule>>('/system/modules'),
   journaux: (niveau?: string, limit = 300) => requete<EntreeJournal[]>(`/system/logs${chaine({ niveau, limit })}`),
 

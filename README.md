@@ -52,6 +52,38 @@ python tools/fetch_model.py   # télécharge yolov8n.pt officiel, convertit ONNX
 
 Sans modèle, le détecteur de secours MOG2 prend automatiquement le relais (100 % hors-ligne).
 
+## ANPR : lecture des plaques (immatriculation)
+
+```python
+from ga.vision.anpr import PlateReader
+lecteur = PlateReader()          # OpenCV 5 (candidats contours) + tesseract (OCR offline)
+lecture = lecteur.read(image)    # -> PlateReading(plaque="AB123CD", score, bbox)
+```
+
+- 100 % hors-ligne : aucune image n'est envoyée à un service externe, seule la chaîne
+  de caractères lue peut quitter la machine (vers les registres habilités).
+- La plaque est capturée **au moment de l'infraction** et stockée dans le dossier de
+  preuve (`evidence.plaque`) — visible dans la console, synchronisée au cloud.
+- Requis : paquet `tesseract-ocr` (inclus dans la CI). Sans tesseract, l'ANPR se
+  désactive proprement et les dossiers restent valides sans plaque.
+
+## Registres officiels (plaque → titulaire, identité)
+
+> **Cadre légal** : l'accès aux registres nationaux (propriétaires de véhicules,
+> carte d'identité) est réservé aux exploitants **habilités** par l'autorité
+> compétente. La couche est **inactive par défaut** (`registries.active: false`) et
+> exige un fondement légal consigné. Chaque interrogation est **audité**, **limitée
+> en débit** (anti-requetes massives), attachée à un **dossier d'instruction** et le
+> n° CIN est **masqué** hors rôle administrateur.
+
+```bash
+GA_REGISTRES_TOKEN=jeton-fourni-par-l-autorite python -m ga.cli serve
+# 3 fournisseurs configurables : "mock" (fictif, tests), "offline" (extract CSV
+# autorisé : vehicules.csv + identites.csv), "http" (endpoint REST habilité)
+# POST /api/dossiers/{uuid}/identifier      GET /api/registres/vehicule/{plaque}?dossier=UUID
+# GET  /api/registres/etat                  (admin)
+```
+
 ## Frontend
 
 Console React/TypeScript (12 vues, français, thème security-ops) : le **build est
@@ -73,7 +105,7 @@ GA_CLOUD_TOKEN=jeton uvicorn cloud_server.app:create_app --factory --port 8100
 ## Tests
 
 ```bash
-python -m pytest tests/ -q        # 85 tests : unitaires, YOLO réel, intégration, cloud E2E, sécurité, résilience
+python -m pytest tests/ -q        # 113 tests : unitaires, YOLO réel, ANPR, registres, intégration, cloud E2E, sécurité, résilience
 python tools/load_test.py         # test de charge API (usage : python tools/load_test.py --users 30 --seconds 15)
 python tools/demo_pipeline.py     # démonstration complète avec vérité terrain
 ```

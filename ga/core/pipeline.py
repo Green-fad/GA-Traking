@@ -20,6 +20,7 @@ from ga.data import database as db
 from ga.data.media import MediaStore
 from ga.data.repositories import EventRepo
 from ga.road.calibration import RoadCalibration
+from ga.vision.anpr import PlateReader
 from ga.road.dossier import DossierBuilder
 from ga.road.events import TrafficAnalyzer, TrafficEvent, VEHICLE_NAMES
 from ga.road.speed import SpeedTracker
@@ -69,6 +70,7 @@ class EventProcessor(GAModule):
         self._camera_ctx: dict[str, dict[str, Any]] = {}
         self._last_frames: dict[str, np.ndarray] = {}
         self._frame_buffers: dict[str, deque] = {}
+        self._anpr = PlateReader()
         self._dossier_ts: dict[str, float] = {}
         self._emit_ts: dict[str, float] = {}
         self._event_stats = {"traitees": 0, "alertes": 0, "dossiers": 0, "evenements_db": 0}
@@ -132,6 +134,17 @@ class EventProcessor(GAModule):
         frame = buffer[0]
         buffer.rotate(-1)
         return frame
+
+    def _lire_plaque(self, frame: np.ndarray | None) -> str | None:
+        """ANPR offline au moment de l'infraction : une lecture par dossier."""
+        if frame is None or not self._anpr.enabled:
+            return None
+        try:
+            lecture = self._anpr.read(frame)
+            return lecture.plaque if lecture else None
+        except Exception as exc:  # l'ANPR ne doit jamais casser un dossier
+            log.warning("lecture de plaque en echec", extra={"ctx": {"erreur": str(exc)}})
+            return None
 
     # ---- traitement des pistes ---------------------------------------------
     def _on_tracks(self, event: GAEvent) -> None:
@@ -276,10 +289,12 @@ class EventProcessor(GAModule):
         if te.kind in DOSSIER_KINDS and ts - self._dossier_ts.get(debounce_key, -1e9) > 30.0:
             self._dossier_ts[debounce_key] = ts
             traj = ctx["trajectoires"].trajectories.get(te.track_id)
+            plaque = self._lire_plaque(frame)
             self.dossiers.build_dossier(
                 kind=te.kind, camera_id=te.camera_id, track_id=te.track_id, ts=te.ts,
                 frame=frame, metrics=te.details,
                 trajectory=[(p.x, p.y) for p in (traj.points[-30:] if traj else [])],
+                plate=plaque,
             )
             self._event_stats["dossiers"] += 1
 

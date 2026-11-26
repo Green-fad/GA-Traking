@@ -16,6 +16,7 @@ redis>=5.0
 
 # Vision IA (acceleration GPU : remplacer par onnxruntime-gpu si CUDA disponible)
 onnxruntime>=1.17
+pytesseract>=0.3.10  # ANPR : OCR des plaques (binaire tesseract requis)
 
 # Tests
 pytest>=8.0

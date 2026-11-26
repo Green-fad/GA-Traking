@@ -63,6 +63,23 @@ cloud:
     api_key: ""
     timeout_seconds: 30
 
+# Registres officiels : immatriculation -> titulaire, identite (CIN).
+# ATTENTION : l'acces a ces registres exige une HABILITATION LEGALE de l'exploitant.
+# Le service reste inactif tant que `active` est false ; consignez le fondement legal.
+# Le jeton du fournisseur est lu depuis la variable d'env nommee par `jeton_env`.
+# fournisseurs : "mock" (jeu d'essai fictif), "offline" (extract CSV autorise),
+# "http" (endpoint REST habite : GET ?plaque= / ?cin=, Bearer, reponse JSON).
+registries:
+  active: false
+  base_legale: ""                 # ex. "arrete municipal n°2026-XX — control automatisé"
+  fournisseur: "mock"
+  url_immatriculation: ""         # plaque -> titulaire
+  url_identite: ""                # numero CIN -> identite
+  jeton_env: "GA_REGISTRES_TOKEN"
+  fichier_extract: ""             # repertoire CSV (vehicules.csv, identites.csv) en mode offline
+  limite_minute: 12               # anti-requetes massives, par utilisateur
+  masquer_adresse: true
+
 cameras:
   - id: "cam-01"
     name: "Entree principale"

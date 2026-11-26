@@ -43,8 +43,12 @@ class DossierBuilder:
 
     def build_dossier(self, kind: str, camera_id: str, track_id: int, ts: float,
                       frame: np.ndarray | None, metrics: dict[str, Any],
-                      trajectory: list[tuple[float, float]] | None = None) -> dict[str, Any]:
-        """Constituer et enregistrer un dossier de preuve ; retourne son resume."""
+                      trajectory: list[tuple[float, float]] | None = None,
+                      plate: str | None = None) -> dict[str, Any]:
+        """Constituer et enregistrer un dossier de preuve ; retourne son resume.
+
+        `plate` : plaque lue par l'ANPR au moment de l'infraction (None si non lue).
+        """
         dossier_uuid = uuid.uuid4().hex
         evidence: dict[str, Any] = {
             "type": kind,
@@ -55,6 +59,8 @@ class DossierBuilder:
             "images": [],
             "trajectoire": trajectory or [],
         }
+        if plate:
+            evidence["plaque"] = plate
         if frame is not None:
             try:
                 rel = self.media.save_frame(frame, camera_id, prefix=f"preuve_{kind}_t{track_id}")

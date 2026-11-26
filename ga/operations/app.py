@@ -30,6 +30,9 @@ from ga.data.media import MediaStore
 from ga.data.repositories import (AlertRepo, AuditRepo, CameraRepo, DossierRepo, EventRepo,
                                   SettingRepo, SyncRepo, UserRepo)
 from ga.intelligence.assistant import Assistant
+from ga.intelligence.registries import (RegistryInactive, RegistryRateLimited,
+                                        RegistryUnavailable, RegistryService,
+                                        masquer_cin, masquer_plaque)
 from ga.intelligence.reports import ReportGenerator
 from ga.operations import auth
 from ga.vision.manager import CameraManager
@@ -106,6 +109,11 @@ class AISettingsUpdate(BaseModel):
     intrusion_min_frames: int | None = Field(default=None, ge=1)
 
 
+class IdentifyRequest(BaseModel):
+    """Plaque optionnelle : sinon la plaque ANPR lue sur le dossier est utilisee."""
+    plaque: str | None = Field(default=None, min_length=3, max_length=20)
+
+
 # ---- fabrique --------------------------------------------------------------
 def create_app(ctx: AppContext) -> FastAPI:
     auth.set_secret(ctx.cfg.server.secret_key)
@@ -116,6 +124,11 @@ def create_app(ctx: AppContext) -> FastAPI:
                        allow_headers=["*"], allow_credentials=False)
     app.state.ctx = ctx
     app.state.ws_clients: set[WebSocket] = set()
+    # registres officiels (immatriculation/identite) : desactives sans habilitation
+    app.state.registries = RegistryService(
+        ctx.cfg.registries,
+        audit_fn=lambda action, username, target, details:
+            auth.audit(action, None, username, target=target, details=details))
 
     def broadcast_alert(event: GAEvent) -> None:
         """Diffuser les alertes aux clients WebSocket connectes."""
@@ -324,6 +337,8 @@ def create_app(ctx: AppContext) -> FastAPI:
             rows = DossierRepo(session).query(status=statut, limit=limit)
             return [{"uuid": d.uuid, "ts": d.created_at.isoformat(), "type": d.kind,
                      "statut": d.status, "camera": d.camera_id,
+                     "plaque": d.evidence.get("plaque"),
+                     "identifie": bool(d.evidence.get("identification")),
                      "images": d.evidence.get("images", []),
                      "metriques": d.evidence.get("metriques", {}),
                      "decision_par": d.decision_by,
@@ -335,8 +350,17 @@ def create_app(ctx: AppContext) -> FastAPI:
             d = DossierRepo(session).get(dossier_uuid)
             if d is None:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, "dossier inconnu")
+            preuves = dict(d.evidence)
+            ident = preuves.get("identification")
+            if ident and user["role"] != "admin":
+                # minimisation : CIN masque pour les roles non admin, adresse jamais affichee
+                ident = dict(ident)
+                ident["cin"] = masquer_cin(str(ident.get("cin", "")))
+                if "adresse" in ident:
+                    ident["adresse"] = "***"
+                preuves["identification"] = ident
             return {"uuid": d.uuid, "ts": d.created_at.isoformat(), "type": d.kind,
-                    "statut": d.status, "camera": d.camera_id, "preuves": d.evidence,
+                    "statut": d.status, "camera": d.camera_id, "preuves": preuves,
                     "decision_par": d.decision_by, "decision_ts": d.decision_ts.isoformat() if d.decision_ts else None,
                     "commentaire": d.decision_comment, "motif_contestation": d.contest_reason}
 
@@ -365,6 +389,68 @@ def create_app(ctx: AppContext) -> FastAPI:
         auth.audit("dossier_conteste", request, user["username"], target=dossier_uuid,
                    details={"motif": body.reason})
         return {"uuid": dossier_uuid, "statut": "conteste"}
+
+    # ---- registres officiels (immatriculation/identite, habilitation obligatoire)
+    @app.post("/api/dossiers/{dossier_uuid}/identifier")
+    def identifier_dossier(dossier_uuid: str, request: Request,
+                           body: IdentifyRequest | None = None,
+                           user: dict = Depends(auth.require_role("operateur"))):
+        """Identifier le titulaire du vehicule d'un dossier d'infraction.
+
+        La plaque vient de l'ANPR (preuve du dossier) ou du corps de la requete ;
+        la finalite est toujours l'instruction d'un dossier (usage limite et audite).
+        """
+        with db.session_scope() as session:
+            d = DossierRepo(session).get(dossier_uuid)
+            if d is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "dossier inconnu")
+            plaque = (body.plaque if body and body.plaque else d.evidence.get("plaque"))
+            evidence = dict(d.evidence)
+        if not plaque:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "aucune plaque lue par l'ANPR sur ce dossier ; fournir 'plaque'")
+        try:
+            resultat = app.state.registries.identifier_vehicule(
+                plaque, user["username"], dossier_uuid=dossier_uuid, role=user["role"])
+        except RegistryInactive as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+        except RegistryRateLimited as exc:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))
+        except RegistryUnavailable as exc:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+        if resultat.get("trouve"):
+            evidence["identification"] = resultat
+            with db.session_scope() as session:
+                DossierRepo(session).update_evidence(dossier_uuid, evidence)
+        auth.audit("registre_vehicule", request, user["username"], target=dossier_uuid,
+                   details={"plaque": masquer_plaque(plaque), "trouve": resultat.get("trouve")})
+        return {"uuid": dossier_uuid, **resultat}
+
+    @app.get("/api/registres/vehicule/{plaque}")
+    def registre_vehicule(plaque: str, request: Request, dossier: str = Query(..., min_length=6),
+                          user: dict = Depends(auth.require_role("operateur"))):
+        """Interrogation directe : finalite obligatoire (?dossier=UUID du dossier en cours)."""
+        with db.session_scope() as session:
+            if DossierRepo(session).get(dossier) is None:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                    "dossier inconnu : l'interrogation doit servir une instruction")
+        try:
+            resultat = app.state.registries.identifier_vehicule(
+                plaque, user["username"], dossier_uuid=dossier, role=user["role"])
+        except RegistryInactive as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+        except RegistryRateLimited as exc:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc))
+        except RegistryUnavailable as exc:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+        auth.audit("registre_vehicule", request, user["username"], target=dossier,
+                   details={"plaque": masquer_plaque(plaque), "trouve": resultat.get("trouve")})
+        return resultat
+
+    @app.get("/api/registres/etat")
+    def registres_etat(user: dict = Depends(auth.require_role("admin"))):
+        """Etat de la couche registres : activation, fondement legal, limites."""
+        return app.state.registries.etat()
 
     # ---- utilisateurs ---------------------------------------------------------
     @app.get("/api/users")

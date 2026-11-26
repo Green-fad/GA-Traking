@@ -93,6 +93,24 @@ class CloudConfig(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
 
 
+class RegistriesConfig(BaseModel):
+    """Acces aux registres officiels (immatriculation -> titulaire, identite).
+
+    DESACTIVE par defaut : l'interrogation des registres nationaux exige une
+    habilitation legale de l'exploitant (fondement a consigner dans base_legale).
+    Le jeton n'est jamais en clair dans la configuration : nom de variable d'env.
+    """
+    active: bool = False
+    base_legale: str = ""
+    fournisseur: Literal["http", "offline", "mock"] = "mock"
+    url_immatriculation: str = ""   # endpoint plaque -> titulaire (fourni par l'autorite)
+    url_identite: str = ""          # endpoint numero CIN -> identite
+    jeton_env: str = "GA_REGISTRES_TOKEN"
+    fichier_extract: str = ""       # extract autorise (CSV) en mode offline
+    limite_minute: int = 12         # anti-requetes massives, par utilisateur
+    masquer_adresse: bool = True
+
+
 class AppConfig(BaseModel):
     site: SiteConfig = Field(default_factory=SiteConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -101,6 +119,7 @@ class AppConfig(BaseModel):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     cloud: CloudConfig = Field(default_factory=CloudConfig)
+    registries: RegistriesConfig = Field(default_factory=RegistriesConfig)
     cameras: list[CameraConfig] = Field(default_factory=list)
 
     def ensure_dirs(self) -> None:

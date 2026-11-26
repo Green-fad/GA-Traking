@@ -1,18 +1,21 @@
 // Dossiers : liste par statut, visionneuse d'images de preuve (via /api/media +
 // blob), décision Valider / Rejeter avec commentaire (opérateur+), contestation
-// d'un dossier validé. Conformité : aucune sanction automatique.
+// d'un dossier validé, identification du titulaire via les registres officiels.
+// Conformité : aucune sanction automatique ; interrogation registre audité.
 import { useCallback, useEffect, useState } from 'react';
 import {
   BadgeCheck,
   Ban,
+  CarFront,
   FileSearch,
   FolderSearch,
   ImageOff,
   MessageSquareWarning,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { api, chargerMediaBlob } from '../api/client';
-import type { Dossier, DossierDetail } from '../api/types';
+import type { Dossier, DossierDetail, IdentificationTitulaire } from '../api/types';
 import { Badge, Card, Champ, Erreur, Modal, PageHeader, Spin } from '../components/ui';
 import { classesStatutDossier, dateFr, libelleStatutDossier, libelleType } from '../utils/format';
 import { useAuth } from '../state/AuthContext';
@@ -81,6 +84,9 @@ export default function Dossiers() {
   const [motifContestation, setMotifContestation] = useState('');
   const [enCours, setEnCours] = useState(false);
   const [imageActive, setImageActive] = useState<string | null>(null);
+  const [identification, setIdentification] = useState<IdentificationTitulaire | null>(null);
+  const [plaqueManuelle, setPlaqueManuelle] = useState('');
+  const [identificationEnCours, setIdentificationEnCours] = useState(false);
 
   const charger = useCallback(
     async (statutCible?: string) => {
@@ -106,7 +112,9 @@ export default function Dossiers() {
       setDetail(complet);
       setCommentaire('');
       setMotifContestation('');
+      setPlaqueManuelle('');
       setImageActive(complet.images[0] ?? null);
+      setIdentification((complet.preuves['identification'] as IdentificationTitulaire | undefined) ?? null);
     } catch (exc) {
       notifier(exc instanceof Error ? exc.message : 'Dossier introuvable', 'erreur');
     }
@@ -139,6 +147,29 @@ export default function Dossiers() {
       notifier(exc instanceof Error ? exc.message : 'Contestation impossible', 'erreur');
     } finally {
       setEnCours(false);
+    }
+  };
+
+  // Identification du titulaire via les registres officiels : finalité = instruction
+  // de ce dossier ; interrogation limitée en débit et audité côté serveur.
+  const identifier = async () => {
+    if (!detail) return;
+    setIdentificationEnCours(true);
+    try {
+      const plaque = plaqueManuelle.trim() || (detail.preuves['plaque'] as string | undefined);
+      const resultat = await api.identifierDossier(detail.uuid, plaque || undefined);
+      if (resultat.trouve) {
+        setIdentification(resultat);
+        notifier(`Titulaire identifié (source : ${resultat.source}) — interrogation audité`, 'succes');
+        const complet = await api.dossier(detail.uuid);
+        setDetail(complet);
+      } else {
+        notifier('Aucun titulaire trouvé pour cette plaque dans le registre', 'avertissement');
+      }
+    } catch (exc) {
+      notifier(exc instanceof Error ? exc.message : 'Identification impossible', 'erreur');
+    } finally {
+      setIdentificationEnCours(false);
     }
   };
 
@@ -198,6 +229,16 @@ export default function Dossiers() {
                   <Badge classes={classesStatutDossier(d.statut)}>{libelleStatutDossier(d.statut)}</Badge>
                   <span className="text-sm font-medium text-ink">{libelleType(d.type)}</span>
                   <span className="font-mono text-xs text-acc">{d.camera ?? '—'}</span>
+                  {d.plaque && (
+                    <span className="font-mono text-[11px] text-succ border border-succ/30 bg-succ/10 px-1.5 py-0.5 rounded">
+                      {d.plaque}
+                    </span>
+                  )}
+                  {d.identifie && (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-indigo-300">
+                      <ShieldCheck size={13} /> identifié
+                    </span>
+                  )}
                   <span className="text-xs text-dim">{dateFr(d.ts)}</span>
                   <span className="text-xs text-dim ml-auto inline-flex items-center gap-1">
                     <FileSearch size={13} /> {d.images.length} preuve(s)
@@ -256,6 +297,71 @@ export default function Dossiers() {
                 </div>
               </div>
             )}
+
+            {/* identification du titulaire (registres officiels) */}
+            <div>
+              <p className="text-xs uppercase tracking-wide text-dim mb-2 inline-flex items-center gap-1">
+                <CarFront size={13} /> Identification du véhicule
+              </p>
+              {Boolean(detail.preuves['plaque']) && (
+                <p className="text-sm text-dim mb-2">
+                  Plaque lue par l'ANPR :{' '}
+                  <span className="font-mono text-succ font-semibold">{String(detail.preuves['plaque'])}</span>
+                </p>
+              )}
+              {identification ? (
+                <div className="rounded-md border border-indigo-500/30 bg-indigo-500/5 px-3 py-3 space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      ['Nom', identification.nom],
+                      ['Prénom', identification.prenom],
+                      ['N° CIN', identification.cin],
+                      ['Véhicule', identification.vehicule],
+                      ['Couleur', identification.couleur],
+                    ]
+                      .filter(([, v]) => Boolean(v))
+                      .map(([cle, valeur]) => (
+                        <div key={cle} className="bg-panel-soft border border-edge rounded-md px-3 py-2">
+                          <p className="text-[11px] text-dim">{cle}</p>
+                          <p className="text-sm font-semibold text-ink">{valeur}</p>
+                        </div>
+                      ))}
+                  </div>
+                  <p className="text-[11px] text-dim">
+                    Source : {identification.source} — interrogé le {dateFr(identification.horodatage)}.
+                    Interrogation <span className="text-ink">limitée en débit et audité</span> (finalité :
+                    instruction de ce dossier). Le n° CIN est masqué hors rôle administrateur.
+                  </p>
+                </div>
+              ) : peutOperation ? (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="min-w-40">
+                    <Champ libelle="Plaque (si l'ANPR n'a rien lu)">
+                      <input
+                        className="champ"
+                        value={plaqueManuelle}
+                        onChange={(e) => setPlaqueManuelle(e.target.value.toUpperCase())}
+                        placeholder="AB-123-CD"
+                        maxLength={20}
+                      />
+                    </Champ>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void identifier()}
+                    className="btn-neutre border-indigo-500/40 text-indigo-300"
+                    disabled={identificationEnCours || (!plaqueManuelle.trim() && !detail.preuves['plaque'])}
+                  >
+                    {identificationEnCours ? <Spin taille={14} /> : <ShieldCheck size={15} />}
+                    Identifier via le registre
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-dim">
+                  Identification réservée aux opérateurs et administrateurs (habilitation registres).
+                </p>
+              )}
+            </div>
 
             {/* décisions existantes */}
             {(detail.commentaire || detail.motif_contestation || detail.decision_par) && (
