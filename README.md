@@ -1,5 +1,5 @@
 # GAtraking
-
+ 
 Plateforme professionnelle de **vision artificielle, surveillance d'infrastructures, analyse des événements et gestion opérationnelle**, à architecture hybride (exécution locale Windows + calcul cloud complémentaire, continuité sans Internet).
 
 ## Modules
